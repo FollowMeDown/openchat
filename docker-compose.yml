@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+  chatdnode0:
+    container_name: chatdnode0
+    image: "openchat/chatdnode"
+    ports:
+      - "26656-26657:26656-26657"
+    environment:
+      - ID=0
+      - LOG=${LOG:-chatd.log}
+    volumes:
+      - ./build:/chatd:Z
+    networks:
+      localnet:
+        ipv4_address: 192.168.20.2
+
+  chatdnode1:
+    container_name: chatdnode1
+    image: "openchat/chatdnode"
+    ports:
+      - "26659-26660:26656-26657"
+    environment:
+      - ID=1
+      - LOG=${LOG:-chatd.log}
+    volumes:
+      - ./build:/chatd:Z
+    networks:
+      localnet:
+        ipv4_address: 192.168.20.3
+
+  chatdnode2:
+    container_name: chatdnode2
+    image: "openchat/chatdnode"
+    environment:
+      - ID=2
+      - LOG=${LOG:-chatd.log}
+    ports:
+      - "26661-26662:26656-26657"
+    volumes:
+      - ./build:/chatd:Z
+    networks:
+      localnet:
+        ipv4_address: 192.168.20.4
+
+  chatdnode3:
+    container_name: chatdnode3
+    image: "openchat/chatdnode"
+    environment:
+      - ID=3
+      - LOG=${LOG:-chatd.log}
+    ports:
+      - "26663-26664:26656-26657"
+    volumes:
+      - ./build:/chatd:Z
+    networks:
+      localnet:
+        ipv4_address: 192.168.20.5
+
+networks:
+  localnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      -
+        subnet: 192.168.20.0/16
+
