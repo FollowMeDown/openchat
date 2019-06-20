@@ -82,6 +82,8 @@ install: go.sum check-ledger
 	go install -mod=readonly $(BUILD_FLAGS) ./cmd/chatd
 	go install -mod=readonly $(BUILD_FLAGS) ./cmd/chatcli
 
+install-debug: go.sum
+	go install -mod=readonly $(BUILD_FLAGS) ./cmd/chatdebug
 
 ########################################
 ### Tools & dependencies
