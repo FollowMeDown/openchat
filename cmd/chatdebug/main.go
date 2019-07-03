@@ -31,7 +31,6 @@ func init() {
 	rootCmd.AddCommand(txCmd)
 	rootCmd.AddCommand(pubkeyCmd)
 	rootCmd.AddCommand(addrCmd)
-	rootCmd.AddCommand(hackCmd)
 	rootCmd.AddCommand(rawBytesCmd)
 }
 
@@ -57,12 +56,6 @@ var addrCmd = &cobra.Command{
 	Use:   "addr",
 	Short: "Convert an address between hex and bech32",
 	RunE:  runAddrCmd,
-}
-
-var hackCmd = &cobra.Command{
-	Use:   "hack",
-	Short: "Boilerplate to Hack on an existing state by scripting some Go...",
-	RunE:  runHackCmd,
 }
 
 var rawBytesCmd = &cobra.Command{

@@ -9,13 +9,20 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	//
+	"github.com/cosmos/cosmos-sdk/x/auth"
+	"github.com/cosmos/cosmos-sdk/x/bank"
+	"github.com/cosmos/cosmos-sdk/x/crisis"
+	distr "github.com/cosmos/cosmos-sdk/x/distribution"
+	"github.com/cosmos/cosmos-sdk/x/gov"
+	"github.com/cosmos/cosmos-sdk/x/mint"
 	"github.com/cosmos/cosmos-sdk/x/slashing"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 )
 
 // export the state of chat for a genesis file
-func (app *ChatApp) ExportAppStateAndValidators(forZeroHeight bool, jailWhiteList []string,
-) (appState json.RawMessage, validators []tmtypes.GenesisValidator, err error) {
+func (app *ChatApp) ExportAppStateAndValidators(forZeroHeight bool, jailWhiteList []string) (
+	appState json.RawMessage, validators []tmtypes.GenesisValidator, err error) {
 
 	// as if they could withdraw from the start of the next block
 	ctx := app.NewContext(true, abci.Header{Height: app.LastBlockHeight()})
@@ -24,7 +31,26 @@ func (app *ChatApp) ExportAppStateAndValidators(forZeroHeight bool, jailWhiteLis
 		app.prepForZeroHeightGenesis(ctx, jailWhiteList)
 	}
 
-	genState := app.mm.ExportGenesis(ctx)
+	// iterate to get the accounts
+	accounts := []GenesisAccount{}
+	appendAccount := func(acc auth.Account) (stop bool) {
+		account := NewGenesisAccountI(acc)
+		accounts = append(accounts, account)
+		return false
+	}
+	app.accountKeeper.IterateAccounts(ctx, appendAccount)
+
+	genState := NewGenesisState(
+		accounts,
+		auth.ExportGenesis(ctx, app.accountKeeper, app.feeCollectionKeeper),
+		bank.ExportGenesis(ctx, app.bankKeeper),
+		staking.ExportGenesis(ctx, app.stakingKeeper),
+		mint.ExportGenesis(ctx, app.mintKeeper),
+		distr.ExportGenesis(ctx, app.distrKeeper),
+		gov.ExportGenesis(ctx, app.govKeeper),
+		crisis.ExportGenesis(ctx, app.crisisKeeper),
+		slashing.ExportGenesis(ctx, app.slashingKeeper),
+	)
 	appState, err = codec.MarshalJSONIndent(app.cdc, genState)
 	if err != nil {
 		return nil, nil, err
@@ -34,8 +60,6 @@ func (app *ChatApp) ExportAppStateAndValidators(forZeroHeight bool, jailWhiteLis
 }
 
 // prepare for fresh start at zero height
-// NOTE zero height genesis is a temporary feature which will be deprecated
-//      in favour of export at a block height
 func (app *ChatApp) prepForZeroHeightGenesis(ctx sdk.Context, jailWhiteList []string) {
 	applyWhiteList := false
 
@@ -55,7 +79,7 @@ func (app *ChatApp) prepForZeroHeightGenesis(ctx sdk.Context, jailWhiteList []st
 	}
 
 	/* Just to be safe, assert the invariants on current state. */
-	app.crisisKeeper.AssertInvariants(ctx, app.Logger())
+	app.assertRuntimeInvariantsOnContext(ctx)
 
 	/* Handle fee distribution state. */
 

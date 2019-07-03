@@ -1,9 +1,13 @@
 #!/usr/bin/make -f
 
+PACKAGES_NOSIMULATION=$(shell go list ./... | grep -v '/simulation')
 PACKAGES_SIMTEST=$(shell go list ./... | grep '/simulation')
 VERSION := $(shell echo $(shell git describe --tags) | sed 's/^v//')
 COMMIT := $(shell git log -1 --format='%H')
+CAT := $(if $(filter $(OS),Windows_NT),type,cat)
 LEDGER_ENABLED ?= true
+GOBIN ?= $(GOPATH)/bin
+GOSUM := $(shell which gosum)
 
 export GO111MODULE = on
 
@@ -39,19 +43,16 @@ endif
 build_tags += $(BUILD_TAGS)
 build_tags := $(strip $(build_tags))
 
-whitespace :=
-whitespace += $(whitespace)
-comma := ,
-build_tags_comma_sep := $(subst $(whitespace),$(comma),$(build_tags))
 
 # process linker flags
 
-ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=chat \
-		  -X github.com/cosmos/cosmos-sdk/version.ServerName=chatd \
-		  -X github.com/cosmos/cosmos-sdk/version.ClientName=chatcli \
-		  -X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
-		  -X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
-		  -X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(build_tags_comma_sep)"
+ldflags = -X github.com/openchatproject/openchat/version.Version=$(VERSION) \
+		  -X github.com/openchatproject/openchat/version.Commit=$(COMMIT) \
+		  -X "github.com/openchatproject/openchat/version.BuildTags=$(build_tags)"
+
+ifneq ($(GOSUM),)
+ldflags += -X github.com/cosmos/cosmos-sdk/version.GoSumHash=$(shell $(GOSUM) go.sum)
+endif
 
 ifeq ($(WITH_CLEVELDB),yes)
   ldflags += -X github.com/cosmos/cosmos-sdk/types.DBBackend=cleveldb
@@ -61,24 +62,29 @@ ldflags := $(strip $(ldflags))
 
 BUILD_FLAGS := -tags "$(build_tags)" -ldflags '$(ldflags)'
 
-## The below include contains the tools target.
-#include contrib/devtools/Makefile
+# The below include contains the tools target.
+include devtools/Makefile
 
-all: install lint check
+all: tools install lint test
+
+########################################
+### Build/Install
 
 build: go.sum
 ifeq ($(OS),Windows_NT)
 	go build -mod=readonly $(BUILD_FLAGS) -o build/chatd.exe ./cmd/chatd
 	go build -mod=readonly $(BUILD_FLAGS) -o build/chatcli.exe ./cmd/chatcli
+	go build -mod=readonly $(BUILD_FLAGS) -o build/chatdebug.exe ./cmd/chatdebug
 else
 	go build -mod=readonly $(BUILD_FLAGS) -o build/chatd ./cmd/chatd
 	go build -mod=readonly $(BUILD_FLAGS) -o build/chatcli ./cmd/chatcli
+	go build -mod=readonly $(BUILD_FLAGS) -o build/chatdebug ./cmd/chatdebug
 endif
 
 build-linux: go.sum update-chat-lite-docs
 	LEDGER_ENABLED=false GOOS=linux GOARCH=amd64 $(MAKE) build
 
-install: go.sum check-ledger
+install: go.sum check-ledger update-chat-lite-docs
 	go install -mod=readonly $(BUILD_FLAGS) ./cmd/chatd
 	go install -mod=readonly $(BUILD_FLAGS) ./cmd/chatcli
 
@@ -92,11 +98,11 @@ go-mod-cache: go.sum
 	@echo "--> Download go modules to local cache"
 	@go mod download
 
-go.sum: go.mod
+go.sum: tools go.mod
 	@echo "--> Ensure dependencies have not been modified"
 	@go mod verify
 
-draw-deps:
+draw-deps: tools
 	@# requires brew install graphviz or apt-get install graphviz
 	go get github.com/RobotsAndPencils/goviz
 	@goviz -i ./cmd/chatd -d 2 | dot -Tpng -o dependency-graph.png
@@ -113,7 +119,6 @@ distclean: clean
 ########################################
 ### Testing
 
-
 check: check-unit check-build
 check-all: check check-race check-cover
 
@@ -129,20 +134,20 @@ check-cover:
 check-build: build
 	@go test -mod=readonly -p 4 `go list ./cli_test/...` -tags=cli_test
 
-
-lint: ci-lint
+lint: tools ci-lint
 ci-lint:
 	golangci-lint run
+	go vet -composites=false -tests=false ./...
 	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" | xargs gofmt -d -s
 	go mod verify
 
-format:
+format: tools
 	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" -not -path "./client/lcd/statik/statik.go" | xargs gofmt -w -s
 	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" -not -path "./client/lcd/statik/statik.go" | xargs misspell -w
 	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" -not -path "./client/lcd/statik/statik.go" | xargs goimports -w -local github.com/cosmos/cosmos-sdk
 
 benchmark:
-	@go test -mod=readonly -bench=. ./...
+	@go test -mod=readonly -bench=. $(PACKAGES_NOSIMULATION)
 
 
 ########################################
@@ -160,7 +165,6 @@ localnet-start: localnet-stop
 localnet-stop:
 	docker-compose down
 
-# include simulations
 
 .PHONY: all build-linux install install-debug \
 	go-mod-cache draw-deps clean \

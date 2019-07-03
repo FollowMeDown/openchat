@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/openchatproject/openchat/app"
+	"github.com/openchatproject/openchat/version"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/keys"
@@ -14,7 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/version"
+	// modules
 	at "github.com/cosmos/cosmos-sdk/x/auth"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/client/rest"
@@ -23,7 +24,6 @@ import (
 	crisisclient "github.com/cosmos/cosmos-sdk/x/crisis/client"
 	distcmd "github.com/cosmos/cosmos-sdk/x/distribution"
 	distClient "github.com/cosmos/cosmos-sdk/x/distribution/client"
-	distrcli "github.com/cosmos/cosmos-sdk/x/distribution/client/cli"
 	dist "github.com/cosmos/cosmos-sdk/x/distribution/client/rest"
 	gv "github.com/cosmos/cosmos-sdk/x/gov"
 	govClient "github.com/cosmos/cosmos-sdk/x/gov/client"
@@ -31,8 +31,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	mintclient "github.com/cosmos/cosmos-sdk/x/mint/client"
 	mintrest "github.com/cosmos/cosmos-sdk/x/mint/client/rest"
-	paramcli "github.com/cosmos/cosmos-sdk/x/params/client/cli"
-	paramsrest "github.com/cosmos/cosmos-sdk/x/params/client/rest"
 	sl "github.com/cosmos/cosmos-sdk/x/slashing"
 	slashingclient "github.com/cosmos/cosmos-sdk/x/slashing/client"
 	slashing "github.com/cosmos/cosmos-sdk/x/slashing/client/rest"
@@ -44,7 +42,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	amino "github.com/tendermint/go-amino"
+	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/libs/cli"
 
 	_ "github.com/openchatproject/openchat/client/lcd/statik"
@@ -64,14 +62,16 @@ func main() {
 	config.SetBech32PrefixForConsensusNode(app.Bech32PrefixConsAddr, app.Bech32PrefixConsPub)
 	config.Seal()
 
+	//sdk.PowerReduction = chat.MicroChatUnit.TruncateInt()
+
 	// TODO: setup keybase, viper object, etc. to be passed into
 	// the below functions and eliminate global vars, like we do
 	// with the cdc
 
 	// Module clients hold cli commnads (tx,query) and lcd routes
 	// TODO: Make the lcd command take a list of ModuleClient
-	mc := []sdk.ModuleClient{
-		govClient.NewModuleClient(gv.StoreKey, cdc, paramcli.GetCmdSubmitProposal(cdc), distrcli.GetCmdSubmitProposal(cdc)),
+	mc := []sdk.ModuleClients{
+		govClient.NewModuleClient(gv.StoreKey, cdc),
 		distClient.NewModuleClient(distcmd.StoreKey, cdc),
 		stakingclient.NewModuleClient(st.StoreKey, cdc),
 		mintclient.NewModuleClient(mint.StoreKey, cdc),
@@ -101,7 +101,7 @@ func main() {
 		client.LineBreak,
 		keys.Commands(),
 		client.LineBreak,
-		version.Cmd,
+		version.VersionCmd,
 		client.NewCompletionCmd(rootCmd, true),
 	)
 
@@ -115,7 +115,7 @@ func main() {
 	}
 }
 
-func queryCmd(cdc *amino.Codec, mc []sdk.ModuleClient) *cobra.Command {
+func queryCmd(cdc *amino.Codec, mc []sdk.ModuleClients) *cobra.Command {
 	queryCmd := &cobra.Command{
 		Use:     "query",
 		Aliases: []string{"q"},
@@ -141,7 +141,7 @@ func queryCmd(cdc *amino.Codec, mc []sdk.ModuleClient) *cobra.Command {
 	return queryCmd
 }
 
-func txCmd(cdc *amino.Codec, mc []sdk.ModuleClient) *cobra.Command {
+func txCmd(cdc *amino.Codec, mc []sdk.ModuleClients) *cobra.Command {
 	txCmd := &cobra.Command{
 		Use:   "tx",
 		Short: "Transactions subcommands",
@@ -176,7 +176,7 @@ func registerRoutes(rs *lcd.RestServer) {
 	dist.RegisterRoutes(rs.CliCtx, rs.Mux, rs.Cdc, distcmd.StoreKey)
 	staking.RegisterRoutes(rs.CliCtx, rs.Mux, rs.Cdc, rs.KeyBase)
 	slashing.RegisterRoutes(rs.CliCtx, rs.Mux, rs.Cdc, rs.KeyBase)
-	gov.RegisterRoutes(rs.CliCtx, rs.Mux, rs.Cdc, paramsrest.ProposalRESTHandler(rs.CliCtx, rs.Cdc), dist.ProposalRESTHandler(rs.CliCtx, rs.Cdc))
+	gov.RegisterRoutes(rs.CliCtx, rs.Mux, rs.Cdc)
 	mintrest.RegisterRoutes(rs.CliCtx, rs.Mux, rs.Cdc)
 }
 

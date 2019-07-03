@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/btcsuite/btcd v0.0.0-20190427004231-96897255fd17 // indirect
-	github.com/cosmos/cosmos-sdk v0.28.2-0.20190521100210-dd89c329516e
+	github.com/cosmos/cosmos-sdk v0.34.7
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/google/gofuzz v1.0.0 // indirect
@@ -14,8 +14,6 @@ require (
 	github.com/mattn/go-isatty v0.0.7 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
-	github.com/otiai10/copy v1.0.1
-	github.com/otiai10/curr v0.0.0-20190513014714-f5a3d24e5776 // indirect
 	github.com/pelletier/go-toml v1.4.0 // indirect
 	github.com/prometheus/client_golang v0.9.3 // indirect
 	github.com/prometheus/procfs v0.0.0-20190516194456-169873baca24 // indirect
@@ -24,6 +22,7 @@ require (
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/viper v1.3.2
+	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tendermint/go-amino v0.15.0
 	github.com/tendermint/tendermint v0.31.5

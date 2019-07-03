@@ -1,12 +1,8 @@
 package server
 
 import (
-	"encoding/json"
-	"net"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"errors"
@@ -19,31 +15,24 @@ import (
 	"github.com/tendermint/tendermint/libs/cli"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	"github.com/tendermint/tendermint/libs/log"
-	pvm "github.com/tendermint/tendermint/privval"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/server"
 	"github.com/cosmos/cosmos-sdk/server/config"
-	"github.com/cosmos/cosmos-sdk/version"
+	"github.com/cosmos/cosmos-sdk/server"
+
+	"github.com/openchatproject/openchat/version"
 )
 
-//// server context
-//type Context struct {
-//	Config *cfg.Config
-//	Logger log.Logger
-//}
-//
-//func NewDefaultContext() *Context {
-//	return NewContext(
-//		cfg.DefaultConfig(),
-//		log.NewTMLogger(log.NewSyncWriter(os.Stdout)),
-//	)
-//}
-//
-//func NewContext(config *cfg.Config, logger log.Logger) *Context {
-//	return &Context{config, logger}
-//}
+
+// server context
+
+func NewDefaultContext() *server.Context {
+	return server.NewContext(
+		cfg.DefaultConfig(),
+		log.NewTMLogger(log.NewSyncWriter(os.Stdout)),
+	)
+}
 
 //___________________________________________________________________________________
 
@@ -52,7 +41,7 @@ import (
 // logger and config object.
 func PersistentPreRunEFn(context *server.Context) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		if cmd.Name() == version.Cmd.Name() {
+		if cmd.Name() == version.VersionCmd.Name() {
 			return nil
 		}
 		config, err := interceptLoadConfig()
@@ -106,6 +95,7 @@ func interceptLoadConfig() (conf *cfg.Config, err error) {
 		conf, err = tcmd.ParseConfig() // NOTE: ParseConfig() creates dir/files as necessary.
 	}
 
+	// create a default chatd config file if it does not exist
 	chatdConfigFilePath := filepath.Join(rootDir, "config/chatd.toml")
 	if _, err := os.Stat(chatdConfigFilePath); os.IsNotExist(err) {
 		appConf, _ := config.ParseConfig()
@@ -153,107 +143,6 @@ func AddCommands(
 		tendermintCmd,
 		server.ExportCmd(ctx, cdc, appExport),
 		client.LineBreak,
-		version.Cmd,
+		version.VersionCmd,
 	)
-}
-
-//___________________________________________________________________________________
-
-// InsertKeyJSON inserts a new JSON field/key with a given value to an existing
-// JSON message. An error is returned if any serialization operation fails.
-//
-// NOTE: The ordering of the keys returned as the resulting JSON message is
-// non-deterministic, so the client should not rely on key ordering.
-func InsertKeyJSON(cdc *codec.Codec, baseJSON []byte, key string, value json.RawMessage) ([]byte, error) {
-	var jsonMap map[string]json.RawMessage
-
-	if err := cdc.UnmarshalJSON(baseJSON, &jsonMap); err != nil {
-		return nil, err
-	}
-
-	jsonMap[key] = value
-	bz, err := codec.MarshalJSONIndent(cdc, jsonMap)
-
-	return json.RawMessage(bz), err
-}
-
-// https://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
-// TODO there must be a better way to get external IP
-func ExternalIP() (string, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return "", err
-	}
-	for _, iface := range ifaces {
-		if skipInterface(iface) {
-			continue
-		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			return "", err
-		}
-		for _, addr := range addrs {
-			ip := addrToIP(addr)
-			if ip == nil || ip.IsLoopback() {
-				continue
-			}
-			ip = ip.To4()
-			if ip == nil {
-				continue // not an ipv4 address
-			}
-			return ip.String(), nil
-		}
-	}
-	return "", errors.New("are you connected to the network?")
-}
-
-// TrapSignal traps SIGINT and SIGTERM and terminates the server correctly.
-func TrapSignal(cleanupFunc func()) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		if cleanupFunc != nil {
-			cleanupFunc()
-		}
-		exitCode := 128
-		switch sig {
-		case syscall.SIGINT:
-			exitCode += int(syscall.SIGINT)
-		case syscall.SIGTERM:
-			exitCode += int(syscall.SIGTERM)
-		}
-		os.Exit(exitCode)
-	}()
-}
-
-// UpgradeOldPrivValFile converts old priv_validator.json file (prior to Tendermint 0.28)
-// to the new priv_validator_key.json and priv_validator_state.json files.
-func UpgradeOldPrivValFile(config *cfg.Config) {
-	if _, err := os.Stat(config.OldPrivValidatorFile()); !os.IsNotExist(err) {
-		if oldFilePV, err := pvm.LoadOldFilePV(config.OldPrivValidatorFile()); err == nil {
-			oldFilePV.Upgrade(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile())
-		}
-	}
-}
-
-func skipInterface(iface net.Interface) bool {
-	if iface.Flags&net.FlagUp == 0 {
-		return true // interface down
-	}
-	if iface.Flags&net.FlagLoopback != 0 {
-		return true // loopback interface
-	}
-	return false
-}
-
-func addrToIP(addr net.Addr) net.IP {
-	var ip net.IP
-	switch v := addr.(type) {
-	case *net.IPNet:
-		ip = v.IP
-	case *net.IPAddr:
-		ip = v.IP
-	}
-	return ip
 }
