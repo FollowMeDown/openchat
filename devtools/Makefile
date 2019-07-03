@@ -42,7 +42,7 @@ mkfile_dir := $(shell cd $(shell dirname $(mkfile_path)); pwd)
 all: tools
 
 tools: tools-stamp
-tools-stamp: $(GOBIN)/statik $(GOBIN)/goimports $(GOBIN)/gosum $(GOBIN)/sdkch
+tools-stamp: $(GOBIN)/statik $(GOBIN)/goimports $(GOBIN)/gosum
 	touch $@
 
 $(GOBIN)/statik:
@@ -52,13 +52,10 @@ $(GOBIN)/goimports:
 	go get golang.org/x/tools/cmd/goimports@v0.0.0-20190114222345-bf090417da8b
 
 $(GOBIN)/gosum:
-	go install -mod=readonly ./cmd/gosum/
-
-$(GOBIN)/sdkch:
-	go install -mod=readonly ./cmd/sdkch/
+	go install -mod=readonly ./devtools/gosum/
 
 tools-clean:
-	cd $(GOBIN) && rm -f golangci-lint statik goimports gosum sdkch
+	cd $(GOBIN) && rm -f statik goimports gosum
 	rm -f tools-stamp
 
 .PHONY: all tools tools-clean
